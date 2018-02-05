@@ -27,10 +27,10 @@ void Blob<Dtype>::Reshape(const vector<int>& shape) {
   for (int i = 0; i < shape.size(); ++i) {
     CHECK_GE(shape[i], 0);
     CHECK_LE(shape[i], INT_MAX / count_) << "blob size exceeds INT_MAX";
-    count_ *= shape[i];
-    shape_[i] = shape[i];
+    count_ *= shape[i];    // 多个维度相乘，求出总数据量
+    shape_[i] = shape[i];    // 放到blob类自己的shape列表里
   }
-  if (count_ > capacity_) {
+  if (count_ > capacity_) {   // 分配blob的内存空间
     capacity_ = count_;
     data_.reset(new SyncedMemory(capacity_ * sizeof(Dtype)));
     diff_.reset(new SyncedMemory(capacity_ * sizeof(Dtype)));
@@ -38,7 +38,7 @@ void Blob<Dtype>::Reshape(const vector<int>& shape) {
 }
 
 template <typename Dtype>
-void Blob<Dtype>::Reshape(const BlobShape& shape) {
+void Blob<Dtype>::Reshape(const BlobShape& shape) {    // 把blob shape转成int类型的vector
   CHECK_LE(shape.dim_size(), kMaxBlobAxes);
   vector<int> shape_vec(shape.dim_size());
   for (int i = 0; i < shape.dim_size(); ++i) {

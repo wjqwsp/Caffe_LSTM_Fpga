@@ -22,8 +22,8 @@ void RecurrentLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
   CHECK_GE(bottom[0]->num_axes(), 2)
       << "bottom[0] must have at least 2 axes -- (#timesteps, #streams, ...)";
-  T_ = bottom[0]->shape(0);
-  N_ = bottom[0]->shape(1);
+  T_ = bottom[0]->shape(0);    // 获得bottom的shape，shape应该在上一层就初始化完成了,bottom[0]为三维，T_代表时间步
+  N_ = bottom[0]->shape(1);    // N_代表独立流的数目
   LOG(INFO) << "Initializing recurrent layer: assuming input batch contains "
             << T_ << " timesteps of " << N_ << " independent streams.";
 
@@ -33,7 +33,7 @@ void RecurrentLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   CHECK_EQ(N_, bottom[1]->shape(1));
 
   // If provided, bottom[2] is a static input to the recurrent net.
-  static_input_ = (bottom.size() > 2);
+  static_input_ = (bottom.size() > 2);    // 可能还会有第3个bottom，代表静态输入
   if (static_input_) {
     CHECK_GE(bottom[2]->num_axes(), 1);
     CHECK_EQ(N_, bottom[2]->shape(0));
@@ -44,10 +44,10 @@ void RecurrentLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   NetParameter net_param;
   net_param.set_force_backward(true);
 
-  net_param.add_input("x");
+  net_param.add_input("x");    // x作为展开网络的输入
   BlobShape input_shape;
-  for (int i = 0; i < bottom[0]->num_axes(); ++i) {
-    input_shape.add_dim(bottom[0]->shape(i));
+  for (int i = 0; i < bottom[0]->num_axes(); ++i) {    // 给unrolled net加入input,初始化其shape
+    input_shape.add_dim(bottom[0]->shape(i));    // lstm层的输入bottom[0]即unrolled net的input x
   }
   net_param.add_input_shape()->CopyFrom(input_shape);
 
@@ -55,7 +55,7 @@ void RecurrentLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   for (int i = 0; i < bottom[1]->num_axes(); ++i) {
     input_shape.add_dim(bottom[1]->shape(i));
   }
-  net_param.add_input("cont");
+  net_param.add_input("cont");    // lstm层的输入bottom[1]即unrolled net的input cont
   net_param.add_input_shape()->CopyFrom(input_shape);
 
   if (static_input_) {
@@ -63,25 +63,25 @@ void RecurrentLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     for (int i = 0; i < bottom[2]->num_axes(); ++i) {
       input_shape.add_dim(bottom[2]->shape(i));
     }
-    net_param.add_input("x_static");
+    net_param.add_input("x_static");    // lstm层的输入bottom[2]即unrolled net的input x_static
     net_param.add_input_shape()->CopyFrom(input_shape);
   }
 
   // Call the child's FillUnrolledNet implementation to specify the unrolled
   // recurrent architecture.
-  this->FillUnrolledNet(&net_param);
+  this->FillUnrolledNet(&net_param);   // 搭建unrolled net的所有parameter
 
   // Prepend this layer's name to the names of each layer in the unrolled net.
   const string& layer_name = this->layer_param_.name();
   if (layer_name.size() > 0) {
     for (int i = 0; i < net_param.layer_size(); ++i) {
       LayerParameter* layer = net_param.mutable_layer(i);
-      layer->set_name(layer_name + "_" + layer->name());
+      layer->set_name(layer_name + "_" + layer->name());   // 给unrolled net的所有层名字加上前缀
     }
   }
 
   // Create the unrolled net.
-  unrolled_net_.reset(new Net<Dtype>(net_param));
+  unrolled_net_.reset(new Net<Dtype>(net_param));    // 创建unrolled net
   unrolled_net_->set_debug_info(
       this->layer_param_.recurrent_param().debug_info());
 
@@ -103,7 +103,7 @@ void RecurrentLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   recur_input_blobs_.resize(num_recur_blobs);
   recur_output_blobs_.resize(num_recur_blobs);
   for (int i = 0; i < recur_input_names.size(); ++i) {
-    recur_input_blobs_[i] =
+    recur_input_blobs_[i] =    // 把unrolled net的recurrent input blobs 和recurrent output blobs填充到recurrent layer的相应队列里
         CHECK_NOTNULL(unrolled_net_->blob_by_name(recur_input_names[i]).get());
     recur_output_blobs_[i] =
         CHECK_NOTNULL(unrolled_net_->blob_by_name(recur_output_names[i]).get());

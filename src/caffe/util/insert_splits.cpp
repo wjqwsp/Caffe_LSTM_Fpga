@@ -18,14 +18,14 @@ void InsertSplits(const NetParameter& param, NetParameter* param_split) {
   map<pair<int, int>, int> top_idx_to_bottom_count;
   map<pair<int, int>, float> top_idx_to_loss_weight;
   map<pair<int, int>, int> top_idx_to_bottom_split_idx;
-  map<int, string> layer_idx_to_layer_name;
-  layer_idx_to_layer_name[-1] = "input";
+  map<int, string> layer_idx_to_layer_name;     // index與layer name的對應關係
+  layer_idx_to_layer_name[-1] = "input";    // input作爲-1層
   // Determine the number of times each blob is used as an input (bottom) blob.
   for (int i = 0; i < param.input_size(); ++i) {
     const string& blob_name = param.input(i);
-    blob_name_to_last_top_idx[blob_name] = make_pair(-1, i);
+    blob_name_to_last_top_idx[blob_name] = make_pair(-1, i);    // 保存某blob的最後一次作爲top的index
   }
-  for (int i = 0; i < param.layer_size(); ++i) {
+  for (int i = 0; i < param.layer_size(); ++i) {    // 逐層遍歷，構建起所有bottom與top的映射關係以及top的被引用次數等數據
     const LayerParameter& layer_param = param.layer(i);
     layer_idx_to_layer_name[i] = layer_param.name();
     for (int j = 0; j < layer_param.bottom_size(); ++j) {
@@ -37,12 +37,12 @@ void InsertSplits(const NetParameter& param, NetParameter* param_split) {
       }
       const pair<int, int>& bottom_idx = make_pair(i, j);
       const pair<int, int>& top_idx = blob_name_to_last_top_idx[blob_name];
-      bottom_idx_to_source_top_idx[bottom_idx] = top_idx;
-      ++top_idx_to_bottom_count[top_idx];
+      bottom_idx_to_source_top_idx[bottom_idx] = top_idx;    // bottom index與top index的映射關係
+      ++top_idx_to_bottom_count[top_idx];    // top index的引用數
     }
     for (int j = 0; j < layer_param.top_size(); ++j) {
       const string& blob_name = layer_param.top(j);
-      blob_name_to_last_top_idx[blob_name] = make_pair(i, j);
+      blob_name_to_last_top_idx[blob_name] = make_pair(i, j);    // 更新last top index
     }
     // A use of a top blob as a loss should be handled similarly to the use of
     // a top blob as an input (bottom) blob to another layer.
@@ -57,6 +57,8 @@ void InsertSplits(const NetParameter& param, NetParameter* param_split) {
       }
     }
   }
+  // 對每一個引用數大於1的top，都加入一個split layer，把一個top分成多個（注意，帶有loss weight的top也當作一次被引用）
+
   // Create split layer for any input blobs used by other layer as bottom
   // blobs more than once.
   for (int i = 0; i < param.input_size(); ++i) {

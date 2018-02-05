@@ -68,8 +68,8 @@ class Layer {
       const vector<Blob<Dtype>*>& top) {
     InitMutex();
     CheckBlobCounts(bottom, top);
-    LayerSetUp(bottom, top);
-    Reshape(bottom, top);
+    LayerSetUp(bottom, top);    // 建立其层内参数的blob，确定其shape，及该层用到的一些变量的初始化
+    Reshape(bottom, top);    // 对该层输出的top blob进行reshape，bottom由上一层决定
     SetLossWeights(top);
   }
 

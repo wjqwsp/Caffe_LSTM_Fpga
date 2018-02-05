@@ -15,7 +15,7 @@ momentum: 0.9
 weight_decay: 0.0000
 snapshot: 5000
 snapshot_prefix: "./examples/coco_caption/lstm_lm"
-solver_mode: GPU
+solver_mode: CPU
 random_seed: 1701
 average_loss: 100
 clip_gradients: 10

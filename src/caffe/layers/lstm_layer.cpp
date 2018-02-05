@@ -45,16 +45,16 @@ void LSTMLayer<Dtype>::OutputBlobNames(vector<string>* names) const {
 
 template <typename Dtype>
 void LSTMLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
-  const int num_output = this->layer_param_.recurrent_param().num_output();
+  const int num_output = this->layer_param_.recurrent_param().num_output();    // lstm层记忆向量的维度
   CHECK_GT(num_output, 0) << "num_output must be positive";
   const FillerParameter& weight_filler =
-      this->layer_param_.recurrent_param().weight_filler();
+      this->layer_param_.recurrent_param().weight_filler();   // 用于初始化权重矩阵
   const FillerParameter& bias_filler =
-      this->layer_param_.recurrent_param().bias_filler();
+      this->layer_param_.recurrent_param().bias_filler();    // 用于初始化偏移向量
 
   // Add generic LayerParameter's (without bottoms/tops) of layer types we'll
   // use to save redundant code.
-  LayerParameter hidden_param;
+  LayerParameter hidden_param;    // 处理输入向量的权重矩阵
   hidden_param.set_type("InnerProduct");
   hidden_param.mutable_inner_product_param()->set_num_output(num_output * 4);
   hidden_param.mutable_inner_product_param()->set_bias_term(false);
@@ -62,7 +62,7 @@ void LSTMLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
   hidden_param.mutable_inner_product_param()->
       mutable_weight_filler()->CopyFrom(weight_filler);
 
-  LayerParameter biased_hidden_param(hidden_param);
+  LayerParameter biased_hidden_param(hidden_param);    // 处理记忆向量的权重矩阵
   biased_hidden_param.mutable_inner_product_param()->set_bias_term(true);
   biased_hidden_param.mutable_inner_product_param()->
       mutable_bias_filler()->CopyFrom(bias_filler);
@@ -84,7 +84,7 @@ void LSTMLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
   split_param.set_type("Split");
 
   vector<BlobShape> input_shapes;
-  RecurrentInputShapes(&input_shapes);
+  RecurrentInputShapes(&input_shapes);    // 构造c_0与h_0的shape
   CHECK_EQ(2, input_shapes.size());
 
   net_param->add_input("c_0");
@@ -93,7 +93,7 @@ void LSTMLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
   net_param->add_input("h_0");
   net_param->add_input_shape()->CopyFrom(input_shapes[1]);
 
-  LayerParameter* cont_slice_param = net_param->add_layer();
+  LayerParameter* cont_slice_param = net_param->add_layer();    // unrolled net的第一个layer，用于按时间切分cont输入
   cont_slice_param->CopyFrom(slice_param);
   cont_slice_param->set_name("cont_slice");
   cont_slice_param->add_bottom("cont");
@@ -102,7 +102,7 @@ void LSTMLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
   // Add layer to transform all timesteps of x to the hidden state dimension.
   //     W_xc_x = W_xc * x + b_c
   {
-    LayerParameter* x_transform_param = net_param->add_layer();
+    LayerParameter* x_transform_param = net_param->add_layer();    // unrolled net的第二个layer，用于让输入通过全连接层
     x_transform_param->CopyFrom(biased_hidden_param);
     x_transform_param->set_name("x_transform");
     x_transform_param->add_param()->set_name("W_xc");
@@ -114,7 +114,7 @@ void LSTMLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
   if (this->static_input_) {
     // Add layer to transform x_static to the gate dimension.
     //     W_xc_x_static = W_xc_static * x_static
-    LayerParameter* x_static_transform_param = net_param->add_layer();
+    LayerParameter* x_static_transform_param = net_param->add_layer();    // unrolled net的第三个layer，用于让静态输入通过全连接层
     x_static_transform_param->CopyFrom(hidden_param);
     x_static_transform_param->mutable_inner_product_param()->set_axis(1);
     x_static_transform_param->set_name("W_xc_x_static");
@@ -122,7 +122,7 @@ void LSTMLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
     x_static_transform_param->add_bottom("x_static");
     x_static_transform_param->add_top("W_xc_x_static_preshape");
 
-    LayerParameter* reshape_param = net_param->add_layer();
+    LayerParameter* reshape_param = net_param->add_layer();    // unrolled net的第四个layer，用于让通过连接层后的静态输入进行reshape
     reshape_param->set_type("Reshape");
     BlobShape* new_shape =
          reshape_param->mutable_reshape_param()->mutable_shape();
@@ -135,12 +135,12 @@ void LSTMLayer<Dtype>::FillUnrolledNet(NetParameter* net_param) const {
     reshape_param->add_top("W_xc_x_static");
   }
 
-  LayerParameter* x_slice_param = net_param->add_layer();
+  LayerParameter* x_slice_param = net_param->add_layer();   // unrolled net的第五个layer，用于让经过全连接层的输入按时间步切分
   x_slice_param->CopyFrom(slice_param);
   x_slice_param->add_bottom("W_xc_x");
   x_slice_param->set_name("W_xc_x_slice");
 
-  LayerParameter output_concat_layer;
+  LayerParameter output_concat_layer;    // 所有时间步的隐藏层结果拼接起来作为最终输出
   output_concat_layer.set_name("h_concat");
   output_concat_layer.set_type("Concat");
   output_concat_layer.add_top("h");

@@ -93,3 +93,6 @@ LOCK
 LOG*
 CURRENT
 MANIFEST-*
+
+cmake-build-release/*
+cmake-build-debug/*

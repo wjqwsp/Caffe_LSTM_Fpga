@@ -7,9 +7,9 @@ random.seed(3)
 import re
 import sys
 
-sys.path.append('./examples/coco_caption/')
+sys.path.append('/var/lstm/caffe/examples/coco_caption/')
 
-COCO_PATH = './data/coco/coco'
+COCO_PATH = '/var/lstm/caffe/data/coco/coco'
 COCO_TOOL_PATH = '%s/PythonAPI/build/lib/pycocotools' % COCO_PATH
 COCO_IMAGE_ROOT = '%s/images' % COCO_PATH
 
@@ -216,8 +216,8 @@ COCO_IMAGE_PATTERN = '%s/images/%%s2014' % COCO_PATH
 COCO_IMAGE_ID_PATTERN = 'COCO_%s2014_%%012d.jpg'
 
 BUFFER_SIZE = 100
-OUTPUT_DIR = './examples/coco_caption/h5_data/buffer_%d' % BUFFER_SIZE
-SPLITS_PATTERN = './data/coco/coco2014_cocoid.%s.txt'
+OUTPUT_DIR = '/var/lstm/caffe/examples/coco_caption/h5_data/buffer_%d' % BUFFER_SIZE
+SPLITS_PATTERN = '/var/lstm/caffe/data/coco/coco2014_cocoid.%s.txt'
 OUTPUT_DIR_PATTERN = '%s/%%s_batches' % OUTPUT_DIR
 
 def process_dataset(split_name, coco_split_name, batch_stream_length,

@@ -16,7 +16,7 @@ void caffe_cpu_gemm<float>(const CBLAS_TRANSPOSE TransA,
     float* C) {
   int lda = (TransA == CblasNoTrans) ? K : M;
   int ldb = (TransB == CblasNoTrans) ? N : K;
-  cblas_sgemm(CblasRowMajor, TransA, TransB, M, N, K, alpha, A, lda, B,
+  cblas_sgemm(CblasRowMajor, TransA, TransB, M, N, K, alpha, A, lda, B,    // M为矩阵C的行，也即矩阵A的行；N为矩阵C的列，也即矩阵B的列；K为矩阵A的列以及矩阵B的行
       ldb, beta, C, N);
 }
 

@@ -26,12 +26,14 @@ void ScalarLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
         << "dimension mismatch between bottom[0]->shape(" << axis_ + i
         << ") and bottom[1]->shape(" << i << ")";
   }
-  outer_dim_ = bottom[0]->count(0, axis_);
-  scalar_dim_ = bottom[1]->count();
-  inner_dim_ = bottom[0]->count(axis_ + bottom[1]->num_axes());
-  top[0]->ReshapeLike(*bottom[0]);
-  sum_result_.Reshape(vector<int>(1, outer_dim_ * scalar_dim_));
-  const int sum_mult_size = std::max(outer_dim_, inner_dim_);
+    // bottom[0]的数目为outer_dim * scalar_dim * inner_dim
+    // bottom[1]的数目为scalar_dim
+  outer_dim_ = bottom[0]->count(0, axis_);     // 外层数据份数
+  scalar_dim_ = bottom[1]->count();    // 对于每一份外层数据，一共的需要缩放的系数数目
+  inner_dim_ = bottom[0]->count(axis_ + bottom[1]->num_axes());    // 被同一系数缩放的数据量
+  top[0]->ReshapeLike(*bottom[0]);    // top和bottom的维度应完全一样
+  sum_result_.Reshape(vector<int>(1, outer_dim_ * scalar_dim_));  // 用于计算bottom[1]的反向误差，作为中间值求和以降维
+  const int sum_mult_size = std::max(outer_dim_, inner_dim_);    // 用于计算bottom[1]的反向误差，用作对矩阵某维度求和
   sum_multiplier_.Reshape(vector<int>(1, sum_mult_size));
   if (sum_multiplier_.cpu_data()[sum_mult_size - 1] != Dtype(1)) {
     caffe_set(sum_mult_size, Dtype(1), sum_multiplier_.mutable_cpu_data());
@@ -40,7 +42,7 @@ void ScalarLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
 
 template <typename Dtype>
 void ScalarLayer<Dtype>::Forward_cpu(
-    const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
+    const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {    // 简单地进行数据缩放
   const Dtype* bottom_data = bottom[0]->cpu_data();
   const Dtype* scalar_data = bottom[1]->cpu_data();
   Dtype* top_data = top[0]->mutable_cpu_data();
@@ -66,30 +68,30 @@ void ScalarLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     const bool is_eltwise = (inner_dim_ == 1 && outer_dim_ == 1);
     Dtype* product = is_eltwise ?
         bottom[1]->mutable_cpu_diff() : bottom[0]->mutable_cpu_diff();
-    caffe_mul(top[0]->count(), top_diff, bottom_data, product);
-    if (!is_eltwise) {
+    caffe_mul(top[0]->count(), top_diff, bottom_data, product);    // 如果outer_dim和inner_dim均为1，说明计算缩放相当于两个向量点乘，结果恰好是向量，那么算反向误差也直接点乘就行
+    if (!is_eltwise) {   // 运行到这说明inner_dim或outer_dim至少一个不为1，需要用bottom[0]的误差矩阵提供较大的缓存空间暂存反向误差。后面就是要将outer_dim和inner_dim这两个维度通过求和降掉
       Dtype* sum_result = NULL;
-      if (inner_dim_ == 1) {
+      if (inner_dim_ == 1) {    // inner_dim为1，说明结果刚好能放进sum_result
         sum_result = product;
-      } else if (sum_result_.count() == 1) {
+      } else if (sum_result_.count() == 1) {  // 这里说明scalar_dim和outer_dim均为1，将inner_dim求和后便是最终结果
         const Dtype* sum_mult = sum_multiplier_.cpu_data();
         Dtype* scalar_diff = bottom[1]->mutable_cpu_diff();
         *scalar_diff = caffe_cpu_dot(inner_dim_, product, sum_mult);
       } else {
         const Dtype* sum_mult = sum_multiplier_.cpu_data();
-        sum_result = (outer_dim_ == 1) ?
+        sum_result = (outer_dim_ == 1) ?    // 如果outer_dim为1，则对inner_dim求和之后便得到scalar_dim长的向量作为最终结果
             bottom[1]->mutable_cpu_diff() : sum_result_.mutable_cpu_data();
-        caffe_cpu_gemv(CblasNoTrans, sum_result_.count(), inner_dim_,
+        caffe_cpu_gemv(CblasNoTrans, sum_result_.count(), inner_dim_,    // 如果outer_dim不为1，则求和后仍需暂存到sum_result中
                        Dtype(1), product, sum_mult, Dtype(0), sum_result);
       }
       if (outer_dim_ != 1) {
         const Dtype* sum_mult = sum_multiplier_.cpu_data();
         Dtype* scalar_diff = bottom[1]->mutable_cpu_diff();
         if (scalar_dim_ == 1) {
-          *scalar_diff = caffe_cpu_dot(outer_dim_, sum_mult, sum_result);
+          *scalar_diff = caffe_cpu_dot(outer_dim_, sum_mult, sum_result);    // scalar_dim为1，则最终结果是一个标量，向量点乘即可
         } else {
           caffe_cpu_gemv(CblasTrans, outer_dim_, scalar_dim_,
-                         Dtype(1), sum_result, sum_mult, Dtype(0), scalar_diff);
+                         Dtype(1), sum_result, sum_mult, Dtype(0), scalar_diff);    // 这是一般情况，将sum_result转置后乘上全为1的向量进行求和降维
         }
       }
     }
@@ -101,7 +103,7 @@ void ScalarLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     for (int n = 0; n < outer_dim_; ++n) {
       for (int d = 0; d < scalar_dim_; ++d) {
         const Dtype factor = scalar_data[d];
-        caffe_cpu_scale(inner_dim_, factor, top_diff, bottom_diff);
+        caffe_cpu_scale(inner_dim_, factor, top_diff, bottom_diff);    // bottom[0]的反向误差计算方法与正向传播基本一致
         bottom_diff += inner_dim_;
         top_diff += inner_dim_;
       }

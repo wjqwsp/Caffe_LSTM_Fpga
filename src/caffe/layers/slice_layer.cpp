@@ -33,12 +33,12 @@ void SliceLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
         << "0 <= slice_dim < " << kMaxBlobAxes;
     CHECK_LT(slice_axis_, num_axes) << "slice_dim out of range.";
   } else {
-    slice_axis_ = bottom[0]->CanonicalAxisIndex(slice_param.axis());
+    slice_axis_ = bottom[0]->CanonicalAxisIndex(slice_param.axis());   // 获得要切分的维度
   }
   vector<int> top_shape = bottom[0]->shape();
-  const int bottom_slice_axis = bottom[0]->shape(slice_axis_);
-  num_slices_ = bottom[0]->count(0, slice_axis_);
-  slice_size_ = bottom[0]->count(slice_axis_ + 1);
+  const int bottom_slice_axis = bottom[0]->shape(slice_axis_);    // 获得该切分的维度大小
+  num_slices_ = bottom[0]->count(0, slice_axis_);    // 有多少份数据被切分
+  slice_size_ = bottom[0]->count(slice_axis_ + 1);    // 每一个分片的最小尺寸，实际分片尺寸可以是这个尺寸的倍数，取决于每一份数据分片数与被切分的维度大小的比例
   int count = 0;
   if (slice_point_.size() != 0) {
     CHECK_EQ(slice_point_.size(), top.size() - 1);
@@ -57,17 +57,17 @@ void SliceLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
       count += top[i]->count();
     }
   } else {
-    CHECK_EQ(bottom_slice_axis % top.size(), 0)
+    CHECK_EQ(bottom_slice_axis % top.size(), 0)    // 被切分维度大小必须能被分片数整除，这样才能均分
         << "Number of top blobs (" << top.size() << ") should evenly "
         << "divide input slice axis (" << bottom_slice_axis << ")";
-    top_shape[slice_axis_] = bottom_slice_axis / top.size();
+    top_shape[slice_axis_] = bottom_slice_axis / top.size();    // top其他维度大小保持不变，被切分维度变成每个分片在该维的大小
     for (int i = 0; i < top.size(); ++i) {
       top[i]->Reshape(top_shape);
       count += top[i]->count();
     }
   }
   CHECK_EQ(count, bottom[0]->count());
-  if (top.size() == 1) {
+  if (top.size() == 1) {   // 如果分片数为1，则说明不需要切分，直接bottom的共享参数
     top[0]->ShareData(*bottom[0]);
     top[0]->ShareDiff(*bottom[0]);
   }
@@ -80,12 +80,12 @@ void SliceLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   int offset_slice_axis = 0;
   const Dtype* bottom_data = bottom[0]->cpu_data();
   const int bottom_slice_axis = bottom[0]->shape(slice_axis_);
-  for (int i = 0; i < top.size(); ++i) {
+  for (int i = 0; i < top.size(); ++i) {    // 一个一个top构造
     Dtype* top_data = top[i]->mutable_cpu_data();
-    const int top_slice_axis = top[i]->shape(slice_axis_);
-    for (int n = 0; n < num_slices_; ++n) {
-      const int top_offset = n * top_slice_axis * slice_size_;
-      const int bottom_offset =
+    const int top_slice_axis = top[i]->shape(slice_axis_);    // 切分后的每一分片在被切分维度的大小
+    for (int n = 0; n < num_slices_; ++n) {   // 遍历每一份要被切分的数据块
+      const int top_offset = n * top_slice_axis * slice_size_;    // 每次移动top_slice_axis * slice_size_数据，这也是每一份被切分的数据块里要移动的数据，以此计算每次移动的目的地址。每次移动的都是连续地址段
+      const int bottom_offset =    // 每次移动的数据源地址
           (n * bottom_slice_axis + offset_slice_axis) * slice_size_;
       caffe_copy(top_slice_axis * slice_size_,
           bottom_data + bottom_offset, top_data + top_offset);
@@ -96,7 +96,7 @@ void SliceLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 
 template <typename Dtype>
 void SliceLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
-      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {    // 反向过程仅仅是内存移动，与正向传播刚好相反。
   if (!propagate_down[0] || top.size() == 1) { return; }
   int offset_slice_axis = 0;
   Dtype* bottom_diff = bottom[0]->mutable_cpu_diff();

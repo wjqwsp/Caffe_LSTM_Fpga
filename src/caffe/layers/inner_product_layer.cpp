@@ -10,7 +10,7 @@
 namespace caffe {
 
 template <typename Dtype>
-void InnerProductLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+void InnerProductLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,    // 该层关键在于重构输入数据的维度，在计算时变成两维数据来计算
       const vector<Blob<Dtype>*>& top) {
   const int num_output = this->layer_param_.inner_product_param().num_output();
   bias_term_ = this->layer_param_.inner_product_param().bias_term();
@@ -83,10 +83,10 @@ void InnerProductLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   const Dtype* bottom_data = bottom[0]->cpu_data();
   Dtype* top_data = top[0]->mutable_cpu_data();
   const Dtype* weight = this->blobs_[0]->cpu_data();
-  caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasTrans, M_, N_, K_, (Dtype)1.,
+  caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasTrans, M_, N_, K_, (Dtype)1.,    // 得到M_行N_列的结果矩阵，代表M_样本个向量，向量维度为N_
       bottom_data, weight, (Dtype)0., top_data);
   if (bias_term_) {
-    caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, M_, N_, 1, (Dtype)1.,
+    caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, M_, N_, 1, (Dtype)1.,    // 得到M_行N_列的偏置矩阵，每行都一样，因为每个结果向量都加上相同的偏置向量
         bias_multiplier_.cpu_data(),
         this->blobs_[1]->cpu_data(), (Dtype)1., top_data);
   }
@@ -100,20 +100,20 @@ void InnerProductLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     const Dtype* top_diff = top[0]->cpu_diff();
     const Dtype* bottom_data = bottom[0]->cpu_data();
     // Gradient with respect to weight
-    caffe_cpu_gemm<Dtype>(CblasTrans, CblasNoTrans, N_, K_, M_, (Dtype)1.,
+    caffe_cpu_gemm<Dtype>(CblasTrans, CblasNoTrans, N_, K_, M_, (Dtype)1.,    // top的误差矩阵需要转置，再乘上输入矩阵，得到参数的误差矩阵
         top_diff, bottom_data, (Dtype)1., this->blobs_[0]->mutable_cpu_diff());
   }
   if (bias_term_ && this->param_propagate_down_[1]) {
     const Dtype* top_diff = top[0]->cpu_diff();
     // Gradient with respect to bias
-    caffe_cpu_gemv<Dtype>(CblasTrans, M_, N_, (Dtype)1., top_diff,
+    caffe_cpu_gemv<Dtype>(CblasTrans, M_, N_, (Dtype)1., top_diff,    // top的误差矩阵转置，再乘上全为1的偏置乘法器，相当于对所有样本的误差向量求和
         bias_multiplier_.cpu_data(), (Dtype)1.,
         this->blobs_[1]->mutable_cpu_diff());
   }
   if (propagate_down[0]) {
     const Dtype* top_diff = top[0]->cpu_diff();
     // Gradient with respect to bottom data
-    caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, M_, K_, N_, (Dtype)1.,
+    caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, M_, K_, N_, (Dtype)1.,    // top的误差矩阵乘上当前的参数矩阵，得到bottom的误差矩阵
         top_diff, this->blobs_[0]->cpu_data(), (Dtype)0.,
         bottom[0]->mutable_cpu_diff());
   }

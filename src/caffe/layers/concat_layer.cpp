@@ -65,7 +65,7 @@ void ConcatLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     const Dtype* bottom_data = bottom[i]->cpu_data();
     const int bottom_concat_axis = bottom[i]->shape(concat_axis_);
     for (int n = 0; n < num_concats_; ++n) {
-      caffe_copy(bottom_concat_axis * concat_input_size_,
+      caffe_copy(bottom_concat_axis * concat_input_size_,     // 与slice layer运算恰好相反
           bottom_data + n * bottom_concat_axis * concat_input_size_,
           top_data + (n * top_concat_axis + offset_concat_axis)
               * concat_input_size_);
@@ -85,7 +85,7 @@ void ConcatLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     const int bottom_concat_axis = bottom[i]->shape(concat_axis_);
     if (propagate_down[i]) {
       Dtype* bottom_diff = bottom[i]->mutable_cpu_diff();
-      for (int n = 0; n < num_concats_; ++n) {
+      for (int n = 0; n < num_concats_; ++n) {    // 与正向过程恰好相反
         caffe_copy(bottom_concat_axis * concat_input_size_, top_diff +
             (n * top_concat_axis + offset_concat_axis) * concat_input_size_,
             bottom_diff + n * bottom_concat_axis * concat_input_size_);
